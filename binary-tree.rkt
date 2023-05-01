@@ -58,3 +58,14 @@
 (define args3 '(3.0 -0.3 -1.24 1.e-8))
 (define vals3 (stream-map (λ (t) (t args3)) ts3))
 (displayln (stream->list vals3))
+
+(define n 5)
+(define ts (build-trees (build-list n (λ (_) fl+))))
+;; TODO replace args definition with a random number generator.
+(define args (build-list (add1 n) (λ (i) (flcos (->fl i)))))
+(define vals (stream-map (λ (t) (t args)) ts))
+(define vals-l (stream->list vals))
+(displayln vals-l)
+;; TODO check that this agrees with the theoretical value.
+(displayln (format "count: ~a" (length vals-l)))
+(displayln (list->set vals-l))
