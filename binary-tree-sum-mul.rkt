@@ -43,10 +43,11 @@
   (match tree
     ;; Found a placeholder. We need to use the form with == because otherwise
     ;; _ acts as a wildcard matching anything (list and symbol form).
-    [(== (list '_)) '(_)]
+    [(list (== '_)) '(_)]
     [(== '_) '(_)]
     ;; Leaf node. Needs to be returned as a list of one element.
     [(list op (== '_) (== '_))
+     ; TODO remove this check and instead add a contract?
      #:when (supported-op? op)
      `((,op _ _))]
     ;; Expression with a sub-expression and a terminal node, same precedence
@@ -62,13 +63,20 @@
          (cons
           `(,op-outer (,op-inner ,a-elt ,b-elt) _)
           (cons
-           `(,op-outer ,a-elt (,op-inner ,b-elt _))
+           `(,op-inner ,a-elt (,op-outer ,b-elt _))
            res))))]
     ;; Expression with a sub-expression and a terminal node, different precedence
     ;; (left branch).
     ;; Ex: (+ (* a b) _) -> ((+ (* a b) _))
     [(list op-outer (list op-inner a b) (== '_))
-     `((,op-outer (,op-inner ,a ,b) _))]
+     (let ([recur-a (build-trees a)]
+           [recur-b (build-trees b)])
+       (for*/fold ([res '()])
+                  ([a-elt recur-a]
+                   [b-elt recur-b])
+         (cons
+          `(,op-outer (,op-inner ,a ,b) _)
+          res)))]
     ;; Expression with a sub-expression and a terminal node, same precedence
     ;; (right branch).
     ;; Ex: _ + (a + b) -> (_ + (a + b), (_ + a) + b)
@@ -82,14 +90,22 @@
          (cons
           `(,op-outer _ (,op-inner ,a-elt ,b-elt))
           (cons
-           `(,op-outer (,op-inner _ ,a-elt) ,b-elt)
+           `(,op-inner (,op-outer _ ,a-elt) ,b-elt)
            res))))]
     ;; Expression with a sub-expression and a terminal node, different precedence
     ;; (right branch).
+    ;; Ex: _ + (a * b) -> _ + (a * b)
     [(list op-outer (== '_) (list op-inner a b))
-     `((,op-outer _ (,op-inner ,a ,b)))]
+     (let ([recur-a (build-trees a)]
+           [recur-b (build-trees b)])
+       (for*/fold ([res '()])
+                  ([a-elt recur-a]
+                   [b-elt recur-b])
+         (cons
+          `(,op-outer _ (,op-inner ,a ,b))
+          res)))]
     ;; Expression with two sub-expressions, same precedences. We have to generate
-    ;; all possible permutations.
+    ;; all possible operation orderings.
     [(list op-outer (list op-lhs a b) (list op-rhs c d))
      #:when (precedence-eq? op-outer op-lhs op-rhs)
      (let ([recur-a (build-trees a)]
@@ -102,12 +118,21 @@
                    [c-elt recur-c]
                    [d-elt recur-d])
          (cons
+          ;; (a + b) + (b + c)
           `(,op-outer (,op-lhs ,a-elt ,b-elt) (,op-rhs ,c-elt ,d-elt))
           (cons
+           ;; ((a + b) + c) + d
            `(,op-rhs (,op-outer (,op-lhs ,a-elt ,b-elt) ,c-elt) ,d-elt)
            (cons
+            ;; a + (b + (c + d))
             `(,op-lhs ,a-elt (,op-outer ,b-elt (,op-rhs ,c-elt ,d-elt)))
-            res)))))]
+            (cons
+             ;; (a + (b + c)) + d
+             `(,op-rhs (,op-lhs ,a-elt (,op-outer ,b-elt ,c-elt)) ,d-elt)
+             (cons
+              ;; a + ((b + c) +d)
+              `(,op-lhs ,a-elt (,op-rhs (,op-outer ,b-elt ,c-elt) ,d-elt))
+              res)))))))]
     ;; Expression with two sub-expressions, of which two have the same precedence.
     ;; case with: (a + b) + (c * d) -> (id, a + (b + (c * d)))
     ;; or:        (a * b) * (c + d) -> (id, a * (b * (c + d)))
