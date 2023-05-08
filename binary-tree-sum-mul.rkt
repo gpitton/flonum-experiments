@@ -3,7 +3,15 @@
 ;; Script to generate all the possible evaluation orders for
 ;; an arithmetic expression using only the operators + and *.
 
-(require racket/flonum)
+;(require racket/flonum)
+(provide build-trees)
+
+
+;; In this script we support only + and *, which at evaluation time get replaced
+;; by fl+ and fl*.
+(define (supported-op? op)
+  (or (eq? op '+) (eq? op '*)))
+
 
 ;; Returns #t if the operators x and y have the same precedence.
 ;; For now supports only fl+ and fl*. Needs to be defined as a macro because in
@@ -17,7 +25,7 @@
 
 ;; Returns #t if x has higher precedence than y.
 (define (precedence>? x y)
-  (and (eq? x fl*) (eq? y fl-)))
+  (and (eq? x '*) (eq? y '+)))
 
 
 ;; Expected input: '(+ (* (+ _ _) _) (+ _ _))
@@ -37,10 +45,10 @@
     ;; _ acts as a wildcard matching anything (list and symbol form).
     [(== (list '_)) '(_)]
     [(== '_) '(_)]
-    ;; Leaf node.
+    ;; Leaf node. Needs to be returned as a list of one element.
     [(list op (== '_) (== '_))
-     #:when (procedure? op)
-     `(,op _ _)]
+     #:when (supported-op? op)
+     `((,op _ _))]
     ;; Expression with a sub-expression and a terminal node, same precedence
     ;; (left branch).
     ;; Ex: (a + b) + _ -> ((a + b) + _, a + (b + _))
@@ -58,8 +66,9 @@
            res))))]
     ;; Expression with a sub-expression and a terminal node, different precedence
     ;; (left branch).
+    ;; Ex: (+ (* a b) _) -> ((+ (* a b) _))
     [(list op-outer (list op-inner a b) (== '_))
-     `(,op-outer (,op-inner ,a ,b) _)]
+     `((,op-outer (,op-inner ,a ,b) _))]
     ;; Expression with a sub-expression and a terminal node, same precedence
     ;; (right branch).
     ;; Ex: _ + (a + b) -> (_ + (a + b), (_ + a) + b)
@@ -73,11 +82,12 @@
          (cons
           `(,op-outer _ (,op-inner ,a-elt ,b-elt))
           (cons
-           `(,op-outer (,op-inner _ ,a-elt) ,b-elt) res))))]
+           `(,op-outer (,op-inner _ ,a-elt) ,b-elt)
+           res))))]
     ;; Expression with a sub-expression and a terminal node, different precedence
     ;; (right branch).
     [(list op-outer (== '_) (list op-inner a b))
-     `(,op-outer _ (,op-inner ,a ,b))]
+     `((,op-outer _ (,op-inner ,a ,b)))]
     ;; Expression with two sub-expressions, same precedences. We have to generate
     ;; all possible permutations.
     [(list op-outer (list op-lhs a b) (list op-rhs c d))
@@ -158,19 +168,3 @@
           res)))]
     ))
          
-
-(define ex0 '(_))
-(build-trees ex0)
-(define ex1 `(,fl+ _ _))
-(displayln (build-trees ex1))
-(define ex2-1 `(,fl+ (,fl* _ _) _))
-(displayln (build-trees ex2-1))
-(define ex2-2 `(,fl+ (,fl+ _ _) _))
-(define ex2-3 `(,fl+ _ (,fl* _ _)))
-(displayln (build-trees ex2-3))
-(define ex2-4 `(,fl+ _ (,fl+ _ _)))
-(displayln (build-trees ex2-4))
-(define ex3-1 `(,fl+ (,fl+ _ _) (,fl+ _ _)))
-(displayln (build-trees ex3-1))
-(define ex3-2 `(,fl+ (,fl* _ _) (,fl* _ _)))
-(displayln (build-trees ex3-2))
