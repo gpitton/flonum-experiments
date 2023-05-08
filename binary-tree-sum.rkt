@@ -65,7 +65,7 @@
 (define args (build-list (add1 n) (λ (i) (flcos (->fl i)))))
 (define vals (stream-map (λ (t) (t args)) ts))
 (define vals-l (stream->list vals))
-(displayln vals-l)
+;(displayln vals-l)
 ;; TODO check that this agrees with the theoretical value.
 (displayln (format "count: ~a" (length vals-l)))
 (displayln (list->set vals-l))
