@@ -1,4 +1,7 @@
 #lang racket
+
+(provide (rename-out [build-trees iso-op-trees]))
+
 (require racket/flonum)
 
 
