@@ -25,6 +25,12 @@
   (and (eq? x '*) (eq? y '+)))
 
 
+;; Helper for passing the arguments to cartesian-product as a list
+;; of lists instead of each list separately.
+(define (cartesian-prod xs)
+  (apply cartesian-product xs))
+
+
 ;; Given an expression, returns a list of sub-expressions with a single
 ;; operator. The list is built in such a way that the original expression
 ;; can be reconstructed by passing it to unflatten-expr.
@@ -96,11 +102,12 @@
            ;; nested sub-expressions with operators different than op.
            (append sub-ab sub-cd))]))]))
 
-
+#|
 (flatten-expr '(+ _ (+ _ _)))
 (flatten-expr '(+ _ (* (+ _ _) (* _ _))))
 (flatten-expr '(* (+ (+ _ _) _) (+ _ _)))
-
+(flatten-expr '(* (+ (+ _ _) (* (+ (+ _ _) _) (+ _ _))) (+ _ _)))
+|#
 
 ;; Returns a list with all the single-operation trees with n nodes.
 ;; The operation is specified by op, and the leaves are picked up
@@ -131,3 +138,75 @@
   (+ $ (+ (+ $ _) $))
   (+ $ (+ $ (+ _ $))))
 |#
+
+
+;; Serialise-leaves collects all the leaves of an expression in the
+;; order they are encountered in a depth-first search.
+(define (serialise-leaves expr)
+  (match expr
+    [(? symbol? s) (list s)]
+    [(list op a b) (append (serialise-leaves a)
+                           (serialise-leaves b))]))
+
+
+;; Glue-sub-exprs accepts a list of expressions, each of which is required
+;; to have a unique operator, and glues them together into a single expression
+;; using the placeholder '$ to mark the insertion points between sub-expressions.
+(define (glue-sub-exprs exprs)
+  ;; The helper returns a list that has one layer of nesting in excess, so the
+  ;; main driver will call the helper and return the car.
+  (define (glue-helper exprs)
+    (if (null? exprs)
+        '()
+        ;; take the first expression in the list and find the leaves marked with $.
+        (let ([current-expr (car exprs)]
+              [remaining-exprs (cdr exprs)])
+          (match current-expr
+            [(== '_) `(_ ,remaining-exprs)]
+            ;; Replace the terminal sign $ with the next sub-expression.
+            ['$ (list (car remaining-exprs) (cdr remaining-exprs))]
+            [(list op a b)
+             ;; The first element in the argument to glue-sub-exprs is the
+             ;; current expression, which in this context must be a. Then
+             ;; the remaining sub-expressions that need to be used are
+             ;; stored in (cdr a-exprs).
+             (let* ([a-exprs (glue-helper (cons a remaining-exprs))]
+                    [b-exprs (glue-helper (cons b (cdr a-exprs)))])
+               ;; Return the result of glueing together the sub-expressions
+               ;; of a with those of b. Then whatever is left is in (cdr b-exprs).
+               (cons
+                (list op (car a-exprs) (car b-exprs))
+                (cdr b-exprs)))]))))
+  ;; Main driver.
+  (car (glue-helper exprs)))
+
+
+(define (equivalent-exprs expr)
+  (let* ([sub-exprs (flatten-expr expr)]
+         [all-sub-exprs
+          (for/list ([sub-expr sub-exprs])
+            (let* ([leaves (serialise-leaves sub-expr)]
+                   ;; The number of operations is one less than the number of leaves.
+                   [n (sub1 (length leaves))])
+              (make-single-op-exprs n (car sub-expr) leaves)))])
+    (for/fold ([res '()])
+              ([sub-exprs-i (cartesian-prod all-sub-exprs)])
+      (displayln sub-exprs-i)
+      (append
+       (glue-sub-exprs sub-exprs-i)
+       res))))
+
+
+;(flatten-expr '(+ _ _))
+;(serialise-leaves '(+ _ _))
+;(take '(_ _) 2)
+;(make-single-op-exprs 1 '+ '(_ _))
+;(glue-sub-exprs '((+ _ _)))
+;(equivalent-exprs '(+ _ _))
+;(make-single-op-exprs 2 '+ (serialise-leaves (car (flatten-expr '(+ _ (+ _ _))))))
+;(equivalent-exprs '(+ _ (+ _ _)))
+;(flatten-expr '(+ _ (* (+ _ _) (* _ _))))
+(glue-sub-exprs '((+ _ $) (* (* $ _) _) (+ _ _)))
+;(equivalent-exprs '(+ _ (* (+ _ _) (* _ _))))
+;(flatten-expr '(* (+ (+ _ _) _) (+ _ _)))
+;(flatten-expr '(* (+ (+ _ _) (* (+ (+ _ _) _) (+ _ _))) (+ _ _)))
