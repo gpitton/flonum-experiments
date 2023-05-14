@@ -100,3 +100,34 @@
 (flatten-expr '(+ _ (+ _ _)))
 (flatten-expr '(+ _ (* (+ _ _) (* _ _))))
 (flatten-expr '(* (+ (+ _ _) _) (+ _ _)))
+
+
+;; Returns a list with all the single-operation trees with n nodes.
+;; The operation is specified by op, and the leaves are picked up
+;; from the list leaves.
+(define (make-single-op-exprs n op leaves)
+  ;; TODO assert length leaves = n + 1
+  (cond [(zero? n) (list (car leaves))]
+        [(eq? n 1) `((,op ,@(take leaves 2)))]
+        [else
+         (for/fold ([res '()])
+                   ([m (in-range n)])
+           (append
+            (let* ([p (- (sub1 n) m)]
+                   [exprs-m (make-single-op-exprs m op (take leaves (add1 m)))]
+                   [exprs-p (make-single-op-exprs p op (drop leaves (add1 m)))])
+              (for*/list ([ti exprs-m] [tj exprs-p])
+                (list op ti tj)))
+            res))]))
+
+#|
+(make-single-op-exprs 1 '+ '(_ $)) ;; expected '((+ _ $))
+(make-single-op-exprs 2 '* '(_ $ _))  ;; expected '((* (* _ $) _) (* _ (* $ _)))
+(make-single-op-exprs 3 '+ '($ $ _ $))
+;; expected
+'((+ (+ (+ $ $) _) $)
+  (+ (+ $ (+ $ _)) $)
+  (+ (+ $ $) (+ _ $))
+  (+ $ (+ (+ $ _) $))
+  (+ $ (+ $ (+ _ $))))
+|#

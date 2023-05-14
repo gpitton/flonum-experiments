@@ -1,33 +1,13 @@
 #lang racket
 
 ;; Script to generate all the possible evaluation orders for
-;; an arithmetic expression using only the operators + and *.
+;; an arithmetic expression with a single arithmetic operator.
 
 ;; TODO it would be useful to have a macro to translate the
 ;; expression syntax using the _ to an expression syntax using
 ;; '() to represent the terminal nodes.
 
 (provide reorder-single-op-expr)
-
-;; In this script we support only + and *, which at evaluation time get replaced
-;; by fl+ and fl*.
-(define (supported-op? op)
-  (or (eq? op '+) (eq? op '*)))
-
-
-;; Returns #t if the operators x and y have the same precedence.
-;; For now supports only fl+ and fl*. Needs to be defined as a macro because in
-;; scheme we cannot overload a function.
-(define-syntax precedence-eq?
-  (syntax-rules ()
-    [(_ x y) (eq? x y)]
-    [(_ x y z)
-     (and (precedence-eq? x y) (precedence-eq? y z))]))
-
-
-;; Returns #t if x has higher precedence than y.
-(define (precedence>? x y)
-  (and (eq? x '*) (eq? y '+)))
 
 
 ;; Serialise the operations in an expression.
@@ -90,7 +70,7 @@
 |#
 
 
-;; Return a list with all the single-operation trees with n nodes.
+;; Returns a list with all the single-operation trees with n nodes.
 ;; The trees are returned in a form without the operations as these
 ;; are not known at this stage. For example, instead of returning
 ;; (+ (+ _ _) (+ _ _)), it just returns: ((_ _) (_ _)).
@@ -128,4 +108,3 @@
          [all-trees (make-single-op-trees n)])
     (for/list ([t all-trees])
       (deserialise-expr t ops))))
-
