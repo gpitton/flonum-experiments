@@ -103,9 +103,11 @@
            (append sub-ab sub-cd))]))]))
 
 #|
+(flatten-expr '(+ _ _))
 (flatten-expr '(+ _ (+ _ _)))
 (flatten-expr '(+ _ (* (+ _ _) (* _ _))))
 (flatten-expr '(* (+ (+ _ _) _) (+ _ _)))
+(flatten-expr '(+ _ (* (+ _ _) (* _ _))))
 (flatten-expr '(* (+ (+ _ _) (* (+ (+ _ _) _) (+ _ _))) (+ _ _)))
 |#
 
@@ -128,6 +130,7 @@
             res))]))
 
 #|
+;(make-single-op-exprs 1 '+ '(_ _)) ; expected: '((+ _ _))
 (make-single-op-exprs 1 '+ '(_ $)) ;; expected '((+ _ $))
 (make-single-op-exprs 2 '* '(_ $ _))  ;; expected '((* (* _ $) _) (* _ (* $ _)))
 (make-single-op-exprs 3 '+ '($ $ _ $))
@@ -149,6 +152,9 @@
                            (serialise-leaves b))]))
 
 
+;(serialise-leaves '(+ _ _))
+
+
 ;; Glue-sub-exprs accepts a list of expressions, each of which is required
 ;; to have a unique operator, and glues them together into a single expression
 ;; using the placeholder '$ to mark the insertion points between sub-expressions.
@@ -162,9 +168,11 @@
         (let ([current-expr (car exprs)]
               [remaining-exprs (cdr exprs)])
           (match current-expr
-            [(== '_) `(_ ,remaining-exprs)]
+            [(== '_) `(_ ,@remaining-exprs)]
             ;; Replace the terminal sign $ with the next sub-expression.
-            ['$ (list (car remaining-exprs) (cdr remaining-exprs))]
+            ['$
+             (let ([rem-expr (glue-helper remaining-exprs)])
+               rem-expr)]
             [(list op a b)
              ;; The first element in the argument to glue-sub-exprs is the
              ;; current expression, which in this context must be a. Then
@@ -172,6 +180,8 @@
              ;; stored in (cdr a-exprs).
              (let* ([a-exprs (glue-helper (cons a remaining-exprs))]
                     [b-exprs (glue-helper (cons b (cdr a-exprs)))])
+               ;(displayln (cons a remaining-exprs))
+               ;(displayln (cons b (cdr a-exprs)))
                ;; Return the result of glueing together the sub-expressions
                ;; of a with those of b. Then whatever is left is in (cdr b-exprs).
                (cons
@@ -180,6 +190,9 @@
   ;; Main driver.
   (car (glue-helper exprs)))
 
+;(glue-sub-exprs '((+ _ _))) ;expected: '(+ _ _)
+;(glue-sub-exprs '((+ _ $) (* _ _)))  ; expected: '(+ _ (* _ _))
+;(glue-sub-exprs '((+ _ $) (* (* $ _) _) (+ _ _))) ; expected: '(+ _ (* (* (+ _ _) _) _))
 
 (define (equivalent-exprs expr)
   (let* ([sub-exprs (flatten-expr expr)]
@@ -189,24 +202,11 @@
                    ;; The number of operations is one less than the number of leaves.
                    [n (sub1 (length leaves))])
               (make-single-op-exprs n (car sub-expr) leaves)))])
-    (for/fold ([res '()])
-              ([sub-exprs-i (cartesian-prod all-sub-exprs)])
-      (displayln sub-exprs-i)
-      (append
-       (glue-sub-exprs sub-exprs-i)
-       res))))
+    (for/list ([sub-exprs-i (cartesian-prod all-sub-exprs)])
+      (glue-sub-exprs sub-exprs-i))))
 
 
-;(flatten-expr '(+ _ _))
-;(serialise-leaves '(+ _ _))
-;(take '(_ _) 2)
-;(make-single-op-exprs 1 '+ '(_ _))
-;(glue-sub-exprs '((+ _ _)))
-;(equivalent-exprs '(+ _ _))
-;(make-single-op-exprs 2 '+ (serialise-leaves (car (flatten-expr '(+ _ (+ _ _))))))
-;(equivalent-exprs '(+ _ (+ _ _)))
-;(flatten-expr '(+ _ (* (+ _ _) (* _ _))))
-(glue-sub-exprs '((+ _ $) (* (* $ _) _) (+ _ _)))
-;(equivalent-exprs '(+ _ (* (+ _ _) (* _ _))))
-;(flatten-expr '(* (+ (+ _ _) _) (+ _ _)))
-;(flatten-expr '(* (+ (+ _ _) (* (+ (+ _ _) _) (+ _ _))) (+ _ _)))
+
+;(equivalent-exprs '(+ _ _))  ; expected: '((+ _ _))
+;(equivalent-exprs '(+ _ (+ _ _))) ; expected: '((+ (+ _ _) _) (+ _ (+ _ _)))
+(equivalent-exprs '(+ _ (* (+ _ _) (* _ _)))) ; expected: '((+ _ (* (* (+ _ _) _) _)) (+ _ (* (+ _ _) (* _ _))))
