@@ -3,6 +3,8 @@
 ;; Script to generate all the possible evaluation orders for
 ;; an arithmetic expression using only the operators + and *.
 
+(provide equivalent-exprs)
+
 
 ;; In this script we support only + and *, which at evaluation time get replaced
 ;; by fl+ and fl*.
@@ -204,9 +206,3 @@
               (make-single-op-exprs n (car sub-expr) leaves)))])
     (for/list ([sub-exprs-i (cartesian-prod all-sub-exprs)])
       (glue-sub-exprs sub-exprs-i))))
-
-
-
-;(equivalent-exprs '(+ _ _))  ; expected: '((+ _ _))
-;(equivalent-exprs '(+ _ (+ _ _))) ; expected: '((+ (+ _ _) _) (+ _ (+ _ _)))
-(equivalent-exprs '(+ _ (* (+ _ _) (* _ _)))) ; expected: '((+ _ (* (* (+ _ _) _) _)) (+ _ (* (+ _ _) (* _ _))))
