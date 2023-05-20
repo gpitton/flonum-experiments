@@ -7,12 +7,13 @@
 (define-test-suite test-reorder-expr
   (test-case
    "single-op"
-   (check-equal? (equivalent-exprs '(+ _ _)) '((+ _ _)))
-   (check-equal? (equivalent-exprs '(+ _ (+ _ _)))
+   (check-equal? (stream->list (equivalent-exprs '(+ _ _)))
+                 '((+ _ _)))
+   (check-equal? (stream->list (equivalent-exprs '(+ _ (+ _ _))))
                  '((+ (+ _ _) _) (+ _ (+ _ _)))))
   (test-case
    "sum-and-mul"
-   (check-equal? (equivalent-exprs '(+ _ (* (+ _ _) (* _ _))))
+   (check-equal? (stream->list (equivalent-exprs '(+ _ (* (+ _ _) (* _ _)))))
                  '((+ _ (* (* (+ _ _) _) _)) (+ _ (* (+ _ _) (* _ _)))))))
 
 

@@ -51,7 +51,7 @@
   (check-equal? (permanent 2) '(+ (* x1 x0) (* x0 x1)))
   (check-equal? (permanent 3)
                 '(+ (* x2 (* x1 x0)) (+ (* x1 (* x2 x0)) (+ (* x2 (* x0 x1))
-                    (+ (* x0 (* x2 x1)) (+ (* x1 (* x0 x2)) (* x0 (* x1 x2)))))))))
+                 (+ (* x0 (* x2 x1)) (+ (* x1 (* x0 x2)) (* x0 (* x1 x2)))))))))
 
 (define ndim 3)
 
@@ -59,8 +59,8 @@
 (define p-expr (permanent ndim))
 (define d (expr-depth p-expr))
 
-;(define args (loguniform-list (expt 2 d)))
-(define args (uniform-sample (expt 2 d)))
+;(define args (loguniform-list ndim))
+(define args (uniform-sample ndim))
 
 (define all-p-exprs (equivalent-exprs p-expr))
 
@@ -70,5 +70,5 @@
     (evaluate-expr ex args)))
 
 (displayln (format "expression depth: ~a" d))
-(displayln (format "equivalent expressions: ~a" (length all-p-exprs)))
+(displayln (format "equivalent expressions: ~a" (stream-length all-p-exprs)))
 (displayln results)

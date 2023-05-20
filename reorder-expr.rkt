@@ -36,6 +36,64 @@
   (apply cartesian-product xs))
 
 
+;; Lazy version of cartesian-prod. xs is a list of lists.
+(define (stream-cartesian-prod xs)
+  (cond [(null? xs) empty-stream]
+        [(null? (cdr xs))
+         ;; This is the last list in the list of lists xs.
+         (for/stream
+             ([x (in-list (car xs))])
+           (list x))]
+        [else
+         ;; Build a stream by creating a list as the first element of the stream
+         ;; and setting up everything for keeping processing the rest of the
+         ;; elements of the stream.
+         (let ([current-list (car xs)]
+               [lower-prod (stream-cartesian-prod (cdr xs))])
+           (for*/stream ([cp (in-list current-list)]
+                         [lp lower-prod])
+             ;; This should be an eager cons, not a stream-cons.
+             `(,cp ,@lp)))]))
+
+
+;; Reference implementation of stream-cart-prod
+(define (eager-cartesian-prod xs)
+  (cond [(null? xs) '()]
+        [(null? (cdr xs))
+         (for/list
+             ([x (car xs)])
+           (list x))]
+        [else
+         (let ([current-list (car xs)]
+               [lower-prod (eager-cartesian-prod (cdr xs))])
+           (for*/list ([cp current-list]
+                       [lp lower-prod])
+             `(,cp ,@lp)))]))
+
+(module+ test
+  (check-equal? (eager-cartesian-prod '(((1) (2))))
+                '(((1)) ((2))))
+  (check-equal? (eager-cartesian-prod '(((1) (2)) ((3) (4))))
+                '(((1) (3)) ((1) (4)) ((2) (3)) ((2) (4))))
+  (check-equal? (eager-cartesian-prod '(((1 2 3) (4 5)) ((6) (7 8) (9)) ((10 11))))
+                '(((1 2 3) (6) (10 11))
+                  ((1 2 3) (7 8) (10 11))
+                  ((1 2 3) (9) (10 11))
+                  ((4 5) (6) (10 11))
+                  ((4 5) (7 8) (10 11))
+                  ((4 5) (9) (10 11))))
+  (check-equal? (stream->list (stream-cartesian-prod '(((1) (2)) ((3) (4)))))
+                '(((1) (3)) ((1) (4)) ((2) (3)) ((2) (4))))
+  (check-equal? (stream->list (stream-cartesian-prod
+                               '(((1 2 3) (4 5)) ((6) (7 8) (9)) ((10 11)))))
+                '(((1 2 3) (6) (10 11))
+                  ((1 2 3) (7 8) (10 11))
+                  ((1 2 3) (9) (10 11))
+                  ((4 5) (6) (10 11))
+                  ((4 5) (7 8) (10 11))
+                  ((4 5) (9) (10 11)))))
+
+
 ;; Given an expression, returns a list of sub-expressions with a single
 ;; operator. The list is built in such a way that the original expression
 ;; can be reconstructed by passing it to unflatten-expr.
@@ -220,5 +278,5 @@
                    ;; The number of operations is one less than the number of leaves.
                    [n (sub1 (length leaves))])
               (make-single-op-exprs n (car sub-expr) leaves)))])
-    (for/list ([sub-exprs-i (cartesian-prod all-sub-exprs)])
+    (for/stream ([sub-exprs-i (stream-cartesian-prod all-sub-exprs)])
       (glue-sub-exprs sub-exprs-i))))
