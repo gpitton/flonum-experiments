@@ -36,21 +36,21 @@
   (apply cartesian-product xs))
 
 
-;; Lazy version of cartesian-prod. xs is a list of lists.
+;; Lazy version of cartesian-prod. xs is a list of streams.
 (define (stream-cartesian-prod xs)
   (cond [(null? xs) empty-stream]
         [(null? (cdr xs))
          ;; This is the last list in the list of lists xs.
          (for/stream
-             ([x (in-list (car xs))])
+             ([x (car xs)])
            (list x))]
         [else
          ;; Build a stream by creating a list as the first element of the stream
          ;; and setting up everything for keeping processing the rest of the
          ;; elements of the stream.
-         (let ([current-list (car xs)]
+         (let ([current-subset (car xs)]
                [lower-prod (stream-cartesian-prod (cdr xs))])
-           (for*/stream ([cp (in-list current-list)]
+           (for*/stream ([cp current-subset]
                          [lp lower-prod])
              ;; This should be an eager cons, not a stream-cons.
              `(,cp ,@lp)))]))
@@ -200,17 +200,40 @@
             res))]))
 
 
+;; Lazy version of make-single-op-exprs.
+(define (make-stream-single-op-exprs n op leaves)
+  ;; TODO assert length leaves = n + 1
+  (cond [(zero? n) (stream (car leaves))]
+        [(eq? n 1) (stream `(,op ,@(take leaves 2)))]
+        [else
+         (for/fold ([res empty-stream])
+                   ([m (in-range n)])
+           (stream-append
+            (let* ([p (- (sub1 n) m)]
+                   [exprs-m (make-stream-single-op-exprs m op (take leaves (add1 m)))]
+                   [exprs-p (make-stream-single-op-exprs p op (drop leaves (add1 m)))])
+              (for*/stream
+                  ([ti exprs-m]
+                   [tj exprs-p])
+                (list op ti tj)))
+            res))]))
+
+
 (module+ test
-  (check-equal? (make-single-op-exprs 1 '+ '(_ _)) '((+ _ _)))
-  (check-equal? (make-single-op-exprs 1 '+ '(_ $)) '((+ _ $)))
-  (check-equal? (make-single-op-exprs 2 '* '(_ $ _))
-                '((* (* _ $) _) (* _ (* $ _))))
-  (check-equal? (make-single-op-exprs 3 '+ '($ $ _ $))
-                '((+ (+ (+ $ $) _) $)
-                  (+ (+ $ (+ $ _)) $)
-                  (+ (+ $ $) (+ _ $))
-                  (+ $ (+ (+ $ _) $))
-                  (+ $ (+ $ (+ _ $))))))
+  (let ([to-test
+         (list make-single-op-exprs
+               (λ (n op leaves) (stream->list (make-stream-single-op-exprs n op leaves))))])
+    (for ([f to-test])
+      (check-equal? (f 1 '+ '(_ _)) '((+ _ _)))
+      (check-equal? (f 1 '+ '(_ $)) '((+ _ $)))
+      (check-equal? (f 2 '* '(_ $ _))
+                    '((* (* _ $) _) (* _ (* $ _))))
+      (check-equal? (f 3 '+ '($ $ _ $))
+                    '((+ (+ (+ $ $) _) $)
+                      (+ (+ $ (+ $ _)) $)
+                      (+ (+ $ $) (+ _ $))
+                      (+ $ (+ (+ $ _) $))
+                      (+ $ (+ $ (+ _ $))))))))
 
 
 ;; Serialise-leaves collects all the leaves of an expression in the
@@ -253,7 +276,7 @@
                     [b-exprs (glue-helper (cons b (cdr a-exprs)))])
                ;(displayln (cons a remaining-exprs))
                ;(displayln (cons b (cdr a-exprs)))
-               ;; Return the result of glueing together the sub-expressions
+               ;; Return the result of gluing together the sub-expressions
                ;; of a with those of b. Then whatever is left is in (cdr b-exprs).
                (cons
                 (list op (car a-exprs) (car b-exprs))
@@ -277,6 +300,23 @@
             (let* ([leaves (serialise-leaves sub-expr)]
                    ;; The number of operations is one less than the number of leaves.
                    [n (sub1 (length leaves))])
-              (make-single-op-exprs n (car sub-expr) leaves)))])
+              ;; (car sub-expr) is the operation of the current sub-expression.
+              (make-stream-single-op-exprs n (car sub-expr) leaves)))])
     (for/stream ([sub-exprs-i (stream-cartesian-prod all-sub-exprs)])
       (glue-sub-exprs sub-exprs-i))))
+
+
+(module+ main
+  (define (depth-n-balanced op n)
+    (if (zero? n)
+        '_
+        (let ([branch (depth-n-balanced op (sub1 n))])
+          (list op branch branch))))
+
+  (define test-depth 10)
+
+  (define tree (depth-n-balanced '+ test-depth))
+
+  (define leaves (for/list ([_ (in-range (expt 2 test-depth))]) '_))
+
+  (stream->list (stream-take (make-stream-single-op-exprs test-depth '+ leaves) 3)))

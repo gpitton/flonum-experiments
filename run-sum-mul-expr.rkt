@@ -54,6 +54,7 @@
                  (+ (* x0 (* x2 x1)) (+ (* x1 (* x0 x2)) (* x0 (* x1 x2)))))))))
 
 (define ndim 3)
+(define n-samples 1000)
 
 
 (define p-expr (permanent ndim))
@@ -62,7 +63,7 @@
 ;(define args (loguniform-list ndim))
 (define args (uniform-sample ndim))
 
-(define all-p-exprs (equivalent-exprs p-expr))
+(define all-p-exprs (stream-take (equivalent-exprs p-expr) n-samples))
 
 ;; evaluate all the elements of all-p-expr on the argument args
 (define results
