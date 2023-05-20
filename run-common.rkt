@@ -2,30 +2,40 @@
 
 ;; Common utilities for the runners.
 
-(provide uniform-list loguniform-list expr-depth evaluate-expr)
+(provide uniform-sample loguniform-sample op->flop expr-depth evaluate-expr x)
 
 (require racket/flonum)
 
-;; Generates a list with n random numbers uniformly sampled in the unit interval.
-(define (uniform-list n)
+
+;; Helper to generate a symbol matching a given number
+(define (x n)
+  (string->symbol (format "x~a" n)))
+
+;; Generates a hash table which maps a symbol to a random number uniformly
+;; sampled in the unit interval.
+(define (uniform-sample n)
   (let ([rng (make-pseudo-random-generator)])
-    (for/list ([_ (in-range n)])
-      (random rng))))
+    (for/hash ([i (in-range n)])
+      (values
+       (x i)
+       (random rng)))))
 
 
-;; Generates a list with n random numbers whose logs are uniformly sampled in the
-;; interval [-6, 0].
-(define (loguniform-list n)
+;; Generates a hash table which maps a symbol to a random number whose log
+;; is uniformly sampled in the interval [-6, 0].
+(define (loguniform-sample n)
   (let ([rng (make-pseudo-random-generator)])
-    (for/list ([_ (in-range n)])
-      (flexpt 10.0 (- (* 7.0 (random rng)) 6.0)))))
+    (for/hash ([i (in-range n)])
+      (values
+       (x i)
+       (flexpt 10.0 (- (* 7.0 (random rng)) 6.0))))))
 
 
 ;; Return the maximum depth of an expression tree.
 (define (expr-depth expr)
   (match expr
     ['() 0]
-    [(== '_) 0]
+    [(? symbol?) 0]
     [(list _ lhs rhs)
      (let ([depth-lhs (expr-depth lhs)]
            [depth-rhs (expr-depth rhs)])
@@ -40,23 +50,19 @@
   (cond [(null? dict) '()]
         [(eq? (caar dict) key) (cdar dict)]
         [else (lookup (cdr dict) key)]))
+
+
+;; Helper for lookup into op-map.
+(define (op->flop op) (lookup op-map op))
       
 
 (define (evaluate-expr expr args)
-  ;; Helper to keep track of the arguments that still need to be evaluated.
-  ;; The expression is the car of expr-args, the arguments are in the cdr.
-  (define (evaluate-helper expr-args)
-    (match (car expr-args)
-      [(== '_) args]
-      [(list op lhs rhs)
-       (let* ([fl-op (lookup op-map op)]
-              [lhs-v (evaluate-helper (cons lhs args))]
-              ;; the arguments yet to be used are stored in (cdr lhs-v)
-              [rhs-v (evaluate-helper (cons rhs (cdr lhs-v)))])
-         (cons
-          ;; value of the current expression
-          (fl-op (car lhs-v) (car rhs-v))
-          ;; remaining arguments.
-          (cdr rhs-v)))]))
-  ;; The result is the first element of the list.
-  (car (evaluate-helper (cons expr args))))
+  (match expr
+    [(? number? n) n]
+    [(? symbol? n) (hash-ref args n)]
+    [(list op lhs rhs)
+     (let* ([fl-op (lookup op-map op)]
+            [lhs-v (evaluate-expr lhs args)]
+            [rhs-v (evaluate-expr rhs args)])
+       ;; value of the current expression
+       (fl-op lhs-v rhs-v))]))

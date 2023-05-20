@@ -38,15 +38,15 @@
 ;; can be reconstructed by passing it to unflatten-expr.
 (define (flatten-expr expr)
   (match expr
-    ['_ '_]
-    [(list op (== '_) (== '_)) `((,op _ _))]
-    [(list op-outer (== '_) (list op-inner c d))
+    [(? symbol? n) n]
+    [(list op (? symbol? n) (? symbol? m)) `((,op ,n ,m))]
+    [(list op-outer (? symbol? n) (list op-inner c d))
      (let ([sub-flat (flatten-expr (list op-inner c d))])
        (if (precedence-eq? op-outer op-inner)
            ;; same operation: keep the current tree.
            (cons
             ;; current sub-expression
-            `(,op-outer _ ,(car sub-flat))
+            `(,op-outer ,n ,(car sub-flat))
             ;; nested sub-expressions with operators different than op.
             (cdr sub-flat))
            ;; different operation: switch to a new tree. We use the symbol
@@ -54,16 +54,16 @@
            ;; where a the next sub-expression needs to have its root.
            (cons
             ;; close the current sub-expression
-            `(,op-outer _ $)
+            `(,op-outer ,n $)
             ;; nested sub-expressions with operators different than op.
             sub-flat)))]
-    [(list op-outer (list op-inner a b) (== '_))
+    [(list op-outer (list op-inner a b) (? symbol? n))
      (let ([sub-flat (flatten-expr (list op-inner a b))])
        (if (precedence-eq? op-outer op-inner)
            ;; same operation: keep the current tree.
            (cons
             ;; current sub-expressions
-            `(,op-outer ,(car sub-flat) _)
+            `(,op-outer ,(car sub-flat) ,n)
             ;; nested sub-expressions with operators different than op.
             (cdr sub-flat))
            ;; different operation: switch to a new tree. We use the symbol
@@ -71,7 +71,7 @@
            ;; where a the next sub-expression needs to have its root.
            (cons
             ;; close the current sub-expression
-            `(,op-outer $ _)
+            `(,op-outer $ ,n)
             ;; nested sub-expressions with operators different than op.
             sub-flat)))]
     [(list op-outer (list op-left a b) (list op-right c d))
@@ -170,11 +170,11 @@
         (let ([current-expr (car exprs)]
               [remaining-exprs (cdr exprs)])
           (match current-expr
-            [(== '_) `(_ ,@remaining-exprs)]
             ;; Replace the terminal sign $ with the next sub-expression.
             ['$
              (let ([rem-expr (glue-helper remaining-exprs)])
                rem-expr)]
+            [(? symbol? n) `(,n ,@remaining-exprs)]
             [(list op a b)
              ;; The first element in the argument to glue-sub-exprs is the
              ;; current expression, which in this context must be a. Then
