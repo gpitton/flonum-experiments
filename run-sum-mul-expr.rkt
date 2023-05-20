@@ -4,6 +4,9 @@
 (require "reorder-expr.rkt")
 (require racket/flonum)
 
+(module+ test
+  (require rackunit))
+
 
 ;; Records an expression that is the inner product of two vectors of size n.
 (define (inner-product n)
@@ -26,8 +29,9 @@
      `(* ,(car lst)
          ,(make-product (cdr lst)))]))
 
-(make-product '(x0 x1)) ;'(* x0 x1)
-(make-product '(x y z)) ;'(* x (* y z))
+(module+ test
+  (check-equal? (make-product '(x0 x1)) '(* x0 x1))
+  (check-equal? (make-product '(x y z)) '(* x (* y z))))
 
 
 ;; Returns an expression for the permanent of an n x n matrix.
@@ -43,14 +47,15 @@
                (if (null? res) prod-p
                    (list '+ prod-p res)))))]))
 
-(permanent 2) ;'(+ (* x1 x0) (* x0 x1))
-(permanent 3) ;'(+ (* x2 (* x1 x0)) (+ (* x1 (* x2 x0)) (+ (* x2 (* x0 x1))
-              ; (+ (* x0 (* x2 x1)) (+ (* x1 (* x0 x2)) (* x0 (* x1 x2)))))))
+(module+ test
+  (check-equal? (permanent 2) '(+ (* x1 x0) (* x0 x1)))
+  (check-equal? (permanent 3)
+                '(+ (* x2 (* x1 x0)) (+ (* x1 (* x2 x0)) (+ (* x2 (* x0 x1))
+                    (+ (* x0 (* x2 x1)) (+ (* x1 (* x0 x2)) (* x0 (* x1 x2)))))))))
 
-(define ndim 4)
+(define ndim 3)
 
-;; TODO inner-product is not the best example: only length-2 subtrees with
-;; the same precedence.
+
 (define p-expr (permanent ndim))
 (define d (expr-depth p-expr))
 

@@ -5,6 +5,9 @@
 
 (provide equivalent-exprs)
 
+(module+ test
+  (require rackunit))
+
 
 ;; In this script we support only + and *, which at evaluation time get replaced
 ;; by fl+ and fl*.
@@ -104,14 +107,21 @@
            ;; nested sub-expressions with operators different than op.
            (append sub-ab sub-cd))]))]))
 
-#|
-(flatten-expr '(+ _ _))
-(flatten-expr '(+ _ (+ _ _)))
-(flatten-expr '(+ _ (* (+ _ _) (* _ _))))
-(flatten-expr '(* (+ (+ _ _) _) (+ _ _)))
-(flatten-expr '(+ _ (* (+ _ _) (* _ _))))
-(flatten-expr '(* (+ (+ _ _) (* (+ (+ _ _) _) (+ _ _))) (+ _ _)))
-|#
+
+(module+ test
+  (check-equal? (flatten-expr '(+ _ _))
+                '((+ _ _)))
+  (check-equal? (flatten-expr '(+ _ (+ _ _)))
+                '((+ _ (+ _ _))))
+  (check-equal? (flatten-expr '(+ _ (* (+ _ _) (* _ _))))
+                '((+ _ $) (* $ (* _ _)) (+ _ _)))
+  (check-equal? (flatten-expr '(* (+ (+ _ _) _) (+ _ _)))
+                '((* $ $) (+ (+ _ _) _) (+ _ _)))
+  (check-equal? (flatten-expr '(+ _ (* (+ _ _) (* _ _))))
+                '((+ _ $) (* $ (* _ _)) (+ _ _)))
+  (check-equal? (flatten-expr '(* (+ (+ _ _) (* (+ (+ _ _) _) (+ _ _))) (+ _ _)))
+                '((* $ $) (+ (+ _ _) $) (* $ $) (+ (+ _ _) _) (+ _ _) (+ _ _))))
+
 
 ;; Returns a list with all the single-operation trees with n nodes.
 ;; The operation is specified by op, and the leaves are picked up
@@ -131,18 +141,18 @@
                 (list op ti tj)))
             res))]))
 
-#|
-;(make-single-op-exprs 1 '+ '(_ _)) ; expected: '((+ _ _))
-(make-single-op-exprs 1 '+ '(_ $)) ;; expected '((+ _ $))
-(make-single-op-exprs 2 '* '(_ $ _))  ;; expected '((* (* _ $) _) (* _ (* $ _)))
-(make-single-op-exprs 3 '+ '($ $ _ $))
-;; expected
-'((+ (+ (+ $ $) _) $)
-  (+ (+ $ (+ $ _)) $)
-  (+ (+ $ $) (+ _ $))
-  (+ $ (+ (+ $ _) $))
-  (+ $ (+ $ (+ _ $))))
-|#
+
+(module+ test
+  (check-equal? (make-single-op-exprs 1 '+ '(_ _)) '((+ _ _)))
+  (check-equal? (make-single-op-exprs 1 '+ '(_ $)) '((+ _ $)))
+  (check-equal? (make-single-op-exprs 2 '* '(_ $ _))
+                '((* (* _ $) _) (* _ (* $ _))))
+  (check-equal? (make-single-op-exprs 3 '+ '($ $ _ $))
+                '((+ (+ (+ $ $) _) $)
+                  (+ (+ $ (+ $ _)) $)
+                  (+ (+ $ $) (+ _ $))
+                  (+ $ (+ (+ $ _) $))
+                  (+ $ (+ $ (+ _ $))))))
 
 
 ;; Serialise-leaves collects all the leaves of an expression in the
@@ -154,7 +164,8 @@
                            (serialise-leaves b))]))
 
 
-;(serialise-leaves '(+ _ _))
+(module+ test
+  (check-equal? (serialise-leaves '(+ _ _)) '(_ _)))
 
 
 ;; Glue-sub-exprs accepts a list of expressions, each of which is required
@@ -192,9 +203,14 @@
   ;; Main driver.
   (car (glue-helper exprs)))
 
-;(glue-sub-exprs '((+ _ _))) ;expected: '(+ _ _)
-;(glue-sub-exprs '((+ _ $) (* _ _)))  ; expected: '(+ _ (* _ _))
-;(glue-sub-exprs '((+ _ $) (* (* $ _) _) (+ _ _))) ; expected: '(+ _ (* (* (+ _ _) _) _))
+
+(module+ test
+  (check-equal? (glue-sub-exprs '((+ _ _))) '(+ _ _))
+  (check-equal? (glue-sub-exprs '((+ _ $) (* _ _)))
+                '(+ _ (* _ _)))
+  (check-equal? (glue-sub-exprs '((+ _ $) (* (* $ _) _) (+ _ _)))
+                '(+ _ (* (* (+ _ _) _) _))))
+
 
 (define (equivalent-exprs expr)
   (let* ([sub-exprs (flatten-expr expr)]

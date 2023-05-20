@@ -3,11 +3,11 @@
 ;; Script to generate all the possible evaluation orders for
 ;; an arithmetic expression with a single arithmetic operator.
 
-;; TODO it would be useful to have a macro to translate the
-;; expression syntax using the _ to an expression syntax using
-;; '() to represent the terminal nodes.
 
 (provide reorder-single-op-expr)
+
+(module+ test
+  (require rackunit))
 
 
 ;; Serialise the operations in an expression.
@@ -24,12 +24,13 @@
              (list op)
              (serialise-expr b))]))
 
-#|
-(serialise-iso-prec-expr '(+ _ _)) ;; expected '(+)
-(serialise-iso-prec-expr '(+ (* _ _) _))  ;; expected '(* +)
-(serialise-iso-prec-expr '(* _ (+ _ _)))  ;; expected '(* +)
-(serialise-iso-prec-expr '(+ (+ _ _ ) (+ _ (* _ _))))  ;; expected '(+ + + *)
-|#
+
+(module+ test
+  (check-equal? (serialise-expr '(+ _ _)) '(+))
+  (check-equal? (serialise-expr '(+ (* _ _) _)) '(* +))
+  (check-equal? (serialise-expr '(* _ (+ _ _))) '(* +))
+  (check-equal? (serialise-expr '(+ (+ _ _ ) (+ _ (* _ _)))) '(+ + + *)))
+
 
 ;; Given a tree and a list of operations, returns an expression where
 ;; the operations are stored in the appropriate spot on the tree, such
@@ -63,11 +64,12 @@
   (let-values ([(expr _) (deserialise-helper tree ops)])
     expr))
 
-#|
-(deserialise-expr '(_ _) '(+))  ;; expected '(+ _ _)
-(deserialise-expr '(_ (_ _)) '(* +))  ;; expected '(* _ (+ _ _))
-(deserialise-expr '((_ _) (_ _)) '(* * +))  ;; expected '(* (* _ _ ) (+ _ _))
-|#
+
+(module+ test
+  (check-equal? (deserialise-expr '(_ _) '(+)) '(+ _ _))
+  (check-equal? (deserialise-expr '(_ (_ _)) '(* +)) '(* _ (+ _ _)))
+  (check-equal? (deserialise-expr '((_ _) (_ _)) '(* * +)) '(* (* _ _ ) (+ _ _))))
+
 
 
 ;; Returns a list with all the single-operation trees with n nodes.
@@ -88,13 +90,14 @@
                 (list ti tj)))
             res))]))
 
-#|
-(length (make-single-op-trees 2)) ;; 2
-(length (make-single-op-trees 4)) ;; 14
-(length (make-single-op-trees 5)) ;; 42
-(length (make-single-op-trees 6)) ;; 132
-(length (make-single-op-trees 7)) ;; 429
-|#
+
+(module+ test
+  (check-eq? (length (make-single-op-trees 2)) 2)
+  (check-eq? (length (make-single-op-trees 4)) 14)
+  (check-eq? (length (make-single-op-trees 5)) 42)
+  (check-eq? (length (make-single-op-trees 6)) 132)
+  (check-eq? (length (make-single-op-trees 7)) 429))
+
 
 ;; Given an expression, returns all the possible reorderings that are
 ;; equivalent to the given expression but differ in the evaluation
