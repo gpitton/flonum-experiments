@@ -53,23 +53,22 @@
                 '(+ (* x2 (* x1 x0)) (+ (* x1 (* x2 x0)) (+ (* x2 (* x0 x1))
                  (+ (* x0 (* x2 x1)) (+ (* x1 (* x0 x2)) (* x0 (* x1 x2)))))))))
 
-(define ndim 4)
-(define n-samples 10000)
 
-
-(define p-expr (permanent ndim))
-(define d (expr-depth p-expr))
-
-;(define args (loguniform-sample ndim))
-(define args (uniform-sample ndim))
-
-(define all-p-exprs (stream-take (equivalent-exprs p-expr) n-samples))
-
-;; evaluate all the elements of all-p-expr on the argument args
-(define results
-  (for/set ([ex all-p-exprs])
-    (evaluate-expr ex args)))
-
-(displayln (format "expression depth: ~a" d))
-(displayln (format "equivalent expressions: ~a" (stream-length all-p-exprs)))
-(displayln results)
+;; Run a few trials for the permanent expression for a few values of ndim.
+(define permanent-trials #hash((3 . 2688) (4 . 10000) (5 . 2000) (6 . 1000) (7 . 200)))
+(for ([(ndim n-samples) (in-hash permanent-trials)])
+  (displayln (format "dimension: ~a" ndim))
+  (let* ([p-expr (permanent ndim)]
+         [depth (expr-depth p-expr)])
+    (displayln (format "expression depth: ~a" depth))
+    (let (
+          ;[args (loguniform-sample ndim)]
+          [args (uniform-sample ndim)]
+          [all-p-exprs (stream-take (equivalent-exprs p-expr) n-samples)])
+      (displayln (format "equivalent expressions: ~a" (stream-length all-p-exprs)))
+      (let ([results
+             ;; evaluate all the elements of all-p-expr on the argument args
+             (for/set ([ex all-p-exprs])
+               (evaluate-expr ex args))])
+        (displayln results)
+        (newline)))))

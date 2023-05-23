@@ -255,8 +255,11 @@
 
 
 (module+ test
-  (define (check-unordered-equal? a b)
-    (check-equal? (list->set a) (list->set b)))
+  ;; unordered version of check-equal?
+  ;; This is not really equivalent to a multiset comparison.
+  (define (check-uequal? a b)
+    (and (check-eq? (length a) (length b))
+         (check-equal? (list->set a) (list->set b))))
 
   (let ([to-test
          (list make-single-op-exprs
@@ -264,9 +267,9 @@
     (for ([f to-test])
       (check-equal? (f 1 '+ '(_ _)) '((+ _ _)))
       (check-equal? (f 1 '+ '(_ $)) '((+ _ $)))
-      (check-unordered-equal? (f 2 '* '(_ $ _))
+      (check-uequal? (f 2 '* '(_ $ _))
                               '((* (* _ $) _) (* _ (* $ _))))
-      (check-unordered-equal? (f 3 '+ '($ $ _ $))
+      (check-uequal? (f 3 '+ '($ $ _ $))
                               '((+ (+ (+ $ $) _) $)
                                 (+ (+ $ (+ $ _)) $)
                                 (+ (+ $ $) (+ _ $))
