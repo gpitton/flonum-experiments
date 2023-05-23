@@ -236,13 +236,15 @@
 ;; | 10 |  32'805 | 38 |
 ;; | 11 |  98'415 | 42 |
 ;; | 12 | 295'245 | 46 |
+;;
 (define (make-stream-single-op-exprs n op leaves)
   ;; TODO assert length leaves = n + 1
   (cond [(zero? n) (stream (car leaves))]
         [(eq? n 1) (stream `(,op ,@(take leaves 2)))]
         [else
          (for/fold ([res empty-stream])
-                   ([m (in-range n)])
+                   ;; shuffle to generate the stream of equivalent expressions in a random order.
+                   ([m (shuffle (range n))])
            (stream-append
             (let* ([p (- (sub1 n) m)])
               (for*/stream
@@ -253,20 +255,23 @@
 
 
 (module+ test
+  (define (check-unordered-equal? a b)
+    (check-equal? (list->set a) (list->set b)))
+
   (let ([to-test
          (list make-single-op-exprs
                (λ (n op leaves) (stream->list (make-stream-single-op-exprs n op leaves))))])
     (for ([f to-test])
       (check-equal? (f 1 '+ '(_ _)) '((+ _ _)))
       (check-equal? (f 1 '+ '(_ $)) '((+ _ $)))
-      (check-equal? (f 2 '* '(_ $ _))
-                    '((* (* _ $) _) (* _ (* $ _))))
-      (check-equal? (f 3 '+ '($ $ _ $))
-                    '((+ (+ (+ $ $) _) $)
-                      (+ (+ $ (+ $ _)) $)
-                      (+ (+ $ $) (+ _ $))
-                      (+ $ (+ (+ $ _) $))
-                      (+ $ (+ $ (+ _ $))))))))
+      (check-unordered-equal? (f 2 '* '(_ $ _))
+                              '((* (* _ $) _) (* _ (* $ _))))
+      (check-unordered-equal? (f 3 '+ '($ $ _ $))
+                              '((+ (+ (+ $ $) _) $)
+                                (+ (+ $ (+ $ _)) $)
+                                (+ (+ $ $) (+ _ $))
+                                (+ $ (+ (+ $ _) $))
+                                (+ $ (+ $ (+ _ $))))))))
 
 
 ;; Serialise-leaves collects all the leaves of an expression in the

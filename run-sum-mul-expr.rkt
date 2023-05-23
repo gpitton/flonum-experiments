@@ -60,8 +60,8 @@
 (define p-expr (permanent ndim))
 (define d (expr-depth p-expr))
 
-(define args (loguniform-sample ndim))
-;(define args (uniform-sample ndim))
+;(define args (loguniform-sample ndim))
+(define args (uniform-sample ndim))
 
 (define all-p-exprs (stream-take (equivalent-exprs p-expr) n-samples))
 
