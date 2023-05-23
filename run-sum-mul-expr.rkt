@@ -53,15 +53,15 @@
                 '(+ (* x2 (* x1 x0)) (+ (* x1 (* x2 x0)) (+ (* x2 (* x0 x1))
                  (+ (* x0 (* x2 x1)) (+ (* x1 (* x0 x2)) (* x0 (* x1 x2)))))))))
 
-(define ndim 3)
-(define n-samples 1000)
+(define ndim 4)
+(define n-samples 10000)
 
 
 (define p-expr (permanent ndim))
 (define d (expr-depth p-expr))
 
-;(define args (loguniform-list ndim))
-(define args (uniform-sample ndim))
+(define args (loguniform-sample ndim))
+;(define args (uniform-sample ndim))
 
 (define all-p-exprs (stream-take (equivalent-exprs p-expr) n-samples))
 

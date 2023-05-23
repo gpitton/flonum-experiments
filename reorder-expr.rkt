@@ -201,6 +201,41 @@
 
 
 ;; Lazy version of make-single-op-exprs.
+;; The recursive calls to make-stream-single-op-exprs should be in the for*/stream,
+;; not in the let* immediately preceding it, to make sure that the stream is not
+;; forced to be evaluated by the for/fold but can be suspended inside the for*/stream.
+;; Here is a comparison:
+;;
+;; listing 1:
+;;
+;;    (let*
+;;      ([p (- (sub1 n) m)]
+;;       [ti (make-stream-single-op-exprs m op (take leaves (add1 m)))]
+;;       [tj (make-stream-single-op-exprs p op (drop leaves (add1 m)))])
+;;         (for*/stream ([ti exprs-m] [tj exprs-p])
+;;            ...
+;;
+;; listing 2:
+;;
+;;    (let*
+;;      ([p (- (sub1 n) m)])
+;;        (for*/stream
+;;            ([ti (make-stream-single-op-exprs m op (take leaves (add1 m)))]
+;;             [tj (make-stream-single-op-exprs p op (drop leaves (add1 m)))])
+;;               ...
+;;
+;; | n  | number of recursive calls (listing 1) | number of recursive calls (listing 2) |
+;; |----|---------|----|
+;; |  3 |      15 | 10 |
+;; |  4 |      45 | 14 |
+;; |  5 |     135 | 18 |
+;; |  6 |     405 | 22 |
+;; |  7 |   1'215 | 26 |
+;; |  8 |   3'645 | 30 |
+;; |  9 |  10'935 | 34 |
+;; | 10 |  32'805 | 38 |
+;; | 11 |  98'415 | 42 |
+;; | 12 | 295'245 | 46 |
 (define (make-stream-single-op-exprs n op leaves)
   ;; TODO assert length leaves = n + 1
   (cond [(zero? n) (stream (car leaves))]
@@ -209,12 +244,10 @@
          (for/fold ([res empty-stream])
                    ([m (in-range n)])
            (stream-append
-            (let* ([p (- (sub1 n) m)]
-                   [exprs-m (make-stream-single-op-exprs m op (take leaves (add1 m)))]
-                   [exprs-p (make-stream-single-op-exprs p op (drop leaves (add1 m)))])
+            (let* ([p (- (sub1 n) m)])
               (for*/stream
-                  ([ti exprs-m]
-                   [tj exprs-p])
+                  ([ti (make-stream-single-op-exprs m op (take leaves (add1 m)))]
+                   [tj (make-stream-single-op-exprs p op (drop leaves (add1 m)))])
                 (list op ti tj)))
             res))]))
 
@@ -295,6 +328,8 @@
 
 (define (equivalent-exprs expr)
   (let* ([sub-exprs (flatten-expr expr)]
+         ;; all-sub-exprs is a list of streams: a stream for each sub-expression
+         ;; with all of its equivalent expressions.
          [all-sub-exprs
           (for/list ([sub-expr sub-exprs])
             (let* ([leaves (serialise-leaves sub-expr)]
@@ -313,7 +348,7 @@
         (let ([branch (depth-n-balanced op (sub1 n))])
           (list op branch branch))))
 
-  (define test-depth 10)
+  (define test-depth 12)
 
   (define tree (depth-n-balanced '+ test-depth))
 
